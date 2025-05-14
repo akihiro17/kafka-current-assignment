@@ -36,7 +36,7 @@ public class Command {
         return Admin.create(props);
     }
 
-    static void execute(Options options, Admin adminClient) throws Exception {
+    static String buildAssignment(Options options, Admin adminClient) throws Exception {
         DescribeClusterResult cluster = adminClient.describeCluster();
 
         List<Integer> brokers = cluster.nodes().get().stream().map(Node::id).collect(Collectors.toList());
@@ -89,7 +89,11 @@ public class Command {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         String json = gson.toJson(assignment);
 
-        System.out.println(json);
+        return json;
+    }
+
+    static void execute(Options options, Admin adminClient) throws Exception {
+        System.out.println(buildAssignment(options, adminClient));
     }
 
     private static final class replicaWithLogDir {

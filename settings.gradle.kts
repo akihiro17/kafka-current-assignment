@@ -1,2 +1,2 @@
-rootProject.name = "show-current-assignment"
+rootProject.name = "kafka-current-assignment"
 

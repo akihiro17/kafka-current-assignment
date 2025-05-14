@@ -12,9 +12,9 @@ repositories {
 
 dependencies {
     // https://mvnrepository.com/artifact/org.apache.kafka/kafka-clients
-    implementation("org.apache.kafka:kafka-clients:3.7.0")
+    implementation("org.apache.kafka:kafka-clients:3.8.0")
     // https://mvnrepository.com/artifact/org.apache.kafka/kafka-server-common
-    implementation("org.apache.kafka:kafka-server-common:3.7.0")
+    implementation("org.apache.kafka:kafka-server-common:3.8.0")
     // https://mvnrepository.com/artifact/com.google.code.gson/gson
     implementation("com.google.code.gson:gson:2.11.0")
     // https://mvnrepository.com/artifact/javax.annotation/javax.annotation-api
