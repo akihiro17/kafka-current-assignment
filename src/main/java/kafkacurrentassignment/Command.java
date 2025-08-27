@@ -6,6 +6,8 @@ import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.DescribeClusterResult;
 import org.apache.kafka.clients.admin.DescribeLogDirsResult;
+import org.apache.kafka.clients.admin.DescribeTopicsResult;
+import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.server.util.CommandDefaultOptions;
@@ -56,6 +58,15 @@ public class Command {
             });
         });
 
+        // Get all unique topics from the topicPartitionListHashMap
+        Set<String> topicNames = topicPartitionListHashMap.keySet().stream()
+            .map(TopicPartition::topic)
+            .collect(Collectors.toSet());
+
+        // Get topic descriptions to obtain correct replica ordering
+        DescribeTopicsResult topicsResult = adminClient.describeTopics(topicNames);
+        Map<String, TopicDescription> topicDescriptions = topicsResult.allTopicNames().get();
+
         Assignment assignment = new Assignment();
         assignment.setVersion(1);
         List<Partition> partitions = new ArrayList<>();
@@ -73,15 +84,34 @@ public class Command {
                 return;
             }
 
+            // Get the correct replica ordering from topic description
+            TopicDescription topicDescription = topicDescriptions.get(topicPartition.topic());
+            List<Integer> correctReplicaOrder = topicDescription.partitions().stream()
+                .filter(partitionInfo -> partitionInfo.partition() == topicPartition.partition())
+                .findFirst()
+                .map(partitionInfo -> partitionInfo.replicas().stream()
+                    .map(Node::id)
+                    .collect(Collectors.toList()))
+                .orElse(new ArrayList<>());
+
+            // Create a map for fast lookup of log directories by broker ID
+            Map<Integer, String> brokerToLogDir = replicaWithLogDirs.stream()
+                .collect(Collectors.toMap(r -> r.id, r -> r.logDir));
+
             Partition p = new Partition();
             p.setTopic(topicPartition.topic());
             p.setPartition(topicPartition.partition());
-            p.setReplicas(
-                replicaWithLogDirs.stream().map(v -> v.id).collect(Collectors.toList())
-            );
+            
+            // Set replicas in the correct order
+            p.setReplicas(correctReplicaOrder);
+            
+            // Set log dirs in the same order as replicas
             p.setLogDirs(
-                replicaWithLogDirs.stream().map(v -> v.logDir).collect(Collectors.toList())
+                correctReplicaOrder.stream()
+                    .map(brokerToLogDir::get)
+                    .collect(Collectors.toList())
             );
+            
             partitions.add(p);
         }));
         assignment.setPartitions(partitions);
