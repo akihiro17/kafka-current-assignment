@@ -123,7 +123,72 @@ public class Command {
     }
 
     static void execute(Options options, Admin adminClient) throws Exception {
-        System.out.println(buildAssignment(options, adminClient));
+        String outputFormat = options.output();
+        
+        if ("table".equals(outputFormat)) {
+            System.out.println(buildTable(options, adminClient));
+        } else if ("reassignment-json".equals(outputFormat)) {
+            System.out.println(buildAssignment(options, adminClient));
+        } else {
+            throw new IllegalArgumentException("Invalid output format: " + outputFormat + ". Use 'reassignment-json' or 'table'.");
+        }
+    }
+    
+    static String buildTable(Options options, Admin adminClient) throws Exception {
+        DescribeClusterResult cluster = adminClient.describeCluster();
+        List<Integer> brokers = cluster.nodes().get().stream().map(Node::id).collect(Collectors.toList());
+        
+        List<BrokerDirInfo> brokerDirInfos = new ArrayList<>();
+        
+        DescribeLogDirsResult logDirs = adminClient.describeLogDirs(brokers);
+        logDirs.allDescriptions().get().forEach((brokerId, logDirDescriptionMap) -> {
+            logDirDescriptionMap.forEach((directoryName, logDirDescription) -> {
+                if (!options.brokers().isEmpty() && !options.brokers().contains(brokerId)) {
+                    return;
+                }
+                
+                long totalSize = logDirDescription.replicaInfos().entrySet().stream()
+                    .filter(entry -> options.topics().isEmpty() || options.topics().contains(entry.getKey().topic()))
+                    .mapToLong(entry -> entry.getValue().size())
+                    .sum();
+                
+                int partitionCount = (int) logDirDescription.replicaInfos().entrySet().stream()
+                    .filter(entry -> options.topics().isEmpty() || options.topics().contains(entry.getKey().topic()))
+                    .count();
+                
+                brokerDirInfos.add(new BrokerDirInfo(brokerId, directoryName, totalSize, partitionCount));
+            });
+        });
+        
+        brokerDirInfos.sort((a, b) -> {
+            int brokerComparison = Integer.compare(a.brokerId, b.brokerId);
+            if (brokerComparison != 0) return brokerComparison;
+            return a.directory.compareTo(b.directory);
+        });
+        
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("%-10s | %-50s | %-18s | %-10s%n", "broker id", "directory", "size(in byte)", "partitions"));
+        sb.append("-".repeat(98)).append("\n");
+        
+        for (BrokerDirInfo info : brokerDirInfos) {
+            sb.append(String.format("%-10d | %-50s | %-18d | %-10d%n", info.brokerId, info.directory, info.size, info.partitionCount));
+        }
+        
+        return sb.toString();
+    }
+    
+    private static class BrokerDirInfo {
+        final int brokerId;
+        final String directory;
+        final long size;
+        final int partitionCount;
+        
+        BrokerDirInfo(int brokerId, String directory, long size, int partitionCount) {
+            this.brokerId = brokerId;
+            this.directory = directory;
+            this.size = size;
+            this.partitionCount = partitionCount;
+        }
     }
 
     private static final class replicaWithLogDir {
@@ -141,6 +206,7 @@ public class Command {
         private final OptionSpec<String> bootstrapServerOpt;
         private final OptionSpec<String> topicListOpt;
         private final OptionSpec<String> brokerListOpt;
+        private final OptionSpec<String> outputOpt;
 
         public Options(String... args) {
             super(args);
@@ -161,6 +227,11 @@ public class Command {
                     .describedAs("Broker list")
                     .ofType(String.class)
                     .defaultsTo("");
+            outputOpt = parser.accepts("output", "Output format: 'reassignment-json' for JSON assignment or 'table' for table format")
+                    .withRequiredArg()
+                    .describedAs("Output format")
+                    .ofType(String.class)
+                    .defaultsTo("reassignment-json");
 
             options = parser.parse(args);
 
@@ -181,6 +252,10 @@ public class Command {
 
         private Set<Integer> brokers() {
             return splitAtCommasAndFilterOutEmpty(brokerListOpt).map(Integer::valueOf).collect(Collectors.toSet());
+        }
+
+        private String output() {
+            return options.valueOf(outputOpt);
         }
     }
 }

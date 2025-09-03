@@ -13,6 +13,7 @@ import com.google.gson.JsonArray;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
 public class CommandTest {
@@ -64,6 +65,27 @@ public class CommandTest {
 
             String got = Command.buildAssignment(options, adminClient);
             assertEquals(expected, got);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Test
+    public void shouldBuildTable() {
+        Command.Options options = new Command.Options("--output", "table");
+        try (MockAdminClient adminClient = new MockAdminClient.Builder().numBrokers(2).controller(0).build()) {
+            Collection<NewTopic> topics = new ArrayList<>();
+            topics.add(new NewTopic("test", 2, (short) 2));
+            adminClient.createTopics(topics);
+
+            String tableOutput = Command.buildTable(options, adminClient);
+            
+            String expected = "broker id  | directory                                          | size(in byte)      | partitions\n" +
+                            "--------------------------------------------------------------------------------------------------\n" +
+                            "0          | /tmp/kafka-logs                                    | 0                  | 2         \n" +
+                            "1          | /tmp/kafka-logs                                    | 0                  | 2         \n";
+            
+            assertEquals(expected, tableOutput);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
