@@ -167,11 +167,11 @@ public class Command {
         });
         
         StringBuilder sb = new StringBuilder();
-        sb.append(String.format("%-10s | %-50s | %-18s | %-10s%n", "broker id", "directory", "size(in byte)", "partitions"));
+        sb.append(String.format("%-10s | %-50s | %-18s | %-10s%n", "broker id", "directory", "size", "partitions"));
         sb.append("-".repeat(98)).append("\n");
         
         for (BrokerDirInfo info : brokerDirInfos) {
-            sb.append(String.format("%-10d | %-50s | %-18d | %-10d%n", info.brokerId, info.directory, info.size, info.partitionCount));
+            sb.append(String.format("%-10d | %-50s | %-18s | %-10d%n", info.brokerId, info.directory, formatBytes(info.size), info.partitionCount));
         }
         
         return sb.toString();
@@ -188,6 +188,25 @@ public class Command {
             this.directory = directory;
             this.size = size;
             this.partitionCount = partitionCount;
+        }
+    }
+
+    private static String formatBytes(long bytes) {
+        if (bytes <= 0) return "0 B";
+        
+        String[] units = {"B", "KiB", "MiB", "GiB", "TiB"};
+        int unitIndex = 0;
+        double size = bytes;
+        
+        while (size >= 1024 && unitIndex < units.length - 1) {
+            size /= 1024;
+            unitIndex++;
+        }
+        
+        if (unitIndex == 0) {
+            return String.format("%.0f %s", size, units[unitIndex]);
+        } else {
+            return String.format("%.1f %s", size, units[unitIndex]);
         }
     }
 

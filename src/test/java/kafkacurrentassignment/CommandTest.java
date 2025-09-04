@@ -80,10 +80,10 @@ public class CommandTest {
 
             String tableOutput = Command.buildTable(options, adminClient);
             
-            String expected = "broker id  | directory                                          | size(in byte)      | partitions\n" +
+            String expected = "broker id  | directory                                          | size               | partitions\n" +
                             "--------------------------------------------------------------------------------------------------\n" +
-                            "0          | /tmp/kafka-logs                                    | 0                  | 2         \n" +
-                            "1          | /tmp/kafka-logs                                    | 0                  | 2         \n";
+                            "0          | /tmp/kafka-logs                                    | 0 B                | 2         \n" +
+                            "1          | /tmp/kafka-logs                                    | 0 B                | 2         \n";
             
             assertEquals(expected, tableOutput);
         } catch (Exception e) {
